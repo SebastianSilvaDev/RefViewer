@@ -1,4 +1,5 @@
 #include <iostream>
+#include <filesystem>
 
 #define SDL_MAIN_USE_CALLBACKS
 #include <SDL3/SDL.h>
@@ -7,12 +8,17 @@
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
 
+#include "PathGrabBag.h"
+
 struct AppState
 {
     SDL_Window* window = nullptr;
     SDL_Renderer* renderer = nullptr;
+    std::string current_folder = "";
     bool is_settings_opened = true;
 };
+
+PathGrabBag grab_bag{};
 
 SDL_AppResult SDL_AppInit(void** appstate, int argc, char** argv)
 {
@@ -41,12 +47,34 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char** argv)
 
 void DialogCallback (void *userdata, const char * const *filelist, int filter)
 {
-
+    if (!*filelist)
+    {
+        SDL_Log("Failed To Get a Path");
+        return;
+    }
+    if (userdata)
+    {
+       auto app_state = static_cast<AppState*>(userdata);
+       app_state->current_folder = *filelist;
+    }
+    SDL_Log("File Selected %s", *filelist);
+    std::string path(*filelist);
+    auto it = std::filesystem::recursive_directory_iterator(path);
+    grab_bag.ResetCollection();
+    for (auto& entry : std::filesystem::recursive_directory_iterator(path))
+    {
+        SDL_Log("File Found: %s", entry.path().string().c_str());
+        grab_bag.AddPathToGrabBag(entry.path());
+    }
+    grab_bag.InitializeBag();
 }
 
 SDL_AppResult SDL_AppIterate(void* appstate)
 {
     AppState* state = static_cast<AppState*>(appstate);
+
+    SDL_SetRenderDrawColorFloat(state->renderer, 0.0f, 0.0f, 0.0f, SDL_ALPHA_OPAQUE_FLOAT);
+    SDL_RenderClear(state->renderer);
 
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
@@ -55,12 +83,28 @@ SDL_AppResult SDL_AppIterate(void* appstate)
     if (state->is_settings_opened)
     {
         ImGui::Begin("Settings", &(state->is_settings_opened), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+        ImGui::SetWindowSize({160.0, 300.0});
         ImGui::SetWindowPos({0.0, 0.0});
-        ImGui::Text("Welcome To ImGui");
-        bool button_clicked = ImGui::Button("Button Here", {100.0, 100.0});
+        if (state->current_folder.empty())
+        {
+            ImGui::Text("No Folder Selected");
+        }
+        else
+        {
+            ImGui::Text(state->current_folder.c_str());
+        }
+        bool button_clicked = ImGui::Button("Select Folder", {100.0, 20.0});
         if (button_clicked)
         {
-            SDL_ShowOpenFolderDialog(DialogCallback, NULL, state->window, NULL, false);
+            SDL_ShowOpenFolderDialog(DialogCallback, appstate, state->window, NULL, false);
+        }
+        if (grab_bag.IsGrabBagReady())
+        {
+            ImGui::Button("Start", {40.0, 20.0});
+            ImGui::SameLine();
+            ImGui::Button("Skip", {40.0, 20.0});
+            ImGui::SameLine();
+            ImGui::Button("Stop", {40.0, 20.0});
         }
         auto Window1Size = ImGui::GetWindowSize();
         ImGui::SetNextWindowPos({0.0, Window1Size.y + 16.0f});
@@ -71,14 +115,13 @@ SDL_AppResult SDL_AppIterate(void* appstate)
         ImGui::SetNextWindowPos({0.0, 0.0});
     }
 
-    ImGui::Begin("Second UI", NULL, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
-    ImGui::Text("Hello From Another thingy");
-    ImGui::End();
+    // ImGui::Begin("Second UI", NULL, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+    // ImGui::Text("Hello From Another thingy");
+    // ImGui::End();
     
     ImGui::Render();
     
-    SDL_SetRenderDrawColorFloat(state->renderer, 0.0f, 0.0f, 0.0f, SDL_ALPHA_OPAQUE_FLOAT);
-    SDL_RenderClear(state->renderer);
+    
 
     ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), state->renderer);
 
@@ -89,10 +132,13 @@ SDL_AppResult SDL_AppIterate(void* appstate)
 
 SDL_AppResult ProcessKeyUp(void* appstate, SDL_Event* event)
 {
+    AppState* state = static_cast<AppState*>(appstate);
+
     switch(event->key.key)
     {
         case SDLK_S:
-
+            state->is_settings_opened = true;
+            break;
         default:
             break;
     }
