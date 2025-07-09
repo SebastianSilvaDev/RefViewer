@@ -4,6 +4,9 @@
 #define SDL_MAIN_USE_CALLBACKS
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h> // What a Include does is get the code in here XD So we are just adding the SDL main code into this file and creating all the functions here
+
+#include "SDL3_image/SDL_image.h"
+
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
@@ -16,6 +19,7 @@ struct AppState
     SDL_Renderer* renderer = nullptr;
     std::string current_folder = "";
     bool is_settings_opened = true;
+    SDL_Texture* current_texture = nullptr;
 };
 
 PathGrabBag grab_bag{};
@@ -69,12 +73,48 @@ void DialogCallback (void *userdata, const char * const *filelist, int filter)
     grab_bag.InitializeBag();
 }
 
+void LoadNextImage(AppState* appstate)
+{
+    SDL_Texture* new_texture;
+
+    auto texture_path = grab_bag.GetNext();
+
+    new_texture = IMG_LoadTexture(appstate->renderer, texture_path->string().c_str());
+
+    appstate->current_texture = new_texture;
+}
+
+void UpdateCurrentTexture(AppState* appstate)
+{
+
+}
+
 SDL_AppResult SDL_AppIterate(void* appstate)
 {
     AppState* state = static_cast<AppState*>(appstate);
 
     SDL_SetRenderDrawColorFloat(state->renderer, 0.0f, 0.0f, 0.0f, SDL_ALPHA_OPAQUE_FLOAT);
     SDL_RenderClear(state->renderer);
+
+    if (state->current_texture != nullptr)
+    {
+        float img_w, img_h;
+        SDL_GetTextureSize(state->current_texture, &img_w, &img_h);
+
+        int window_w, window_h;
+
+        SDL_GetWindowSize(state->window, &window_w, &window_h);
+
+        float aspect_ratio = (float)window_h / img_h;
+
+        SDL_FRect image_rect;
+        image_rect.x = 0.0;
+        image_rect.y = 0.0;
+        image_rect.w = (float)window_w / aspect_ratio;
+        image_rect.h = (float)window_h / aspect_ratio;
+
+        SDL_RenderTexture(state->renderer, state->current_texture, NULL, &image_rect);
+    }
 
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
@@ -100,8 +140,12 @@ SDL_AppResult SDL_AppIterate(void* appstate)
         }
         if (grab_bag.IsGrabBagReady())
         {
-            ImGui::Button("Start", {40.0, 20.0});
+            auto b_start_button_clicked = ImGui::Button("Start", {40.0, 20.0});
             ImGui::SameLine();
+            if (b_start_button_clicked)
+            {
+                LoadNextImage(state);
+            }
             ImGui::Button("Skip", {40.0, 20.0});
             ImGui::SameLine();
             ImGui::Button("Stop", {40.0, 20.0});
@@ -173,6 +217,11 @@ void SDL_AppQuit(void* appstate, SDL_AppResult result)
     ImGui::DestroyContext();
 
     AppState* state = static_cast<AppState*>(appstate);
+
+    if (state->current_texture != nullptr)
+    {
+        SDL_DestroyTexture(state->current_texture);
+    }
 
     SDL_DestroyRenderer(state->renderer);
     SDL_DestroyWindow(state->window);
