@@ -15,7 +15,6 @@ PathGrabBag::PathGrabBag()
 void PathGrabBag::AddPathToGrabBag(const std::filesystem::path &in_path)
 {
     m_path_collection.push_back(in_path);
-    
 }
 
 void PathGrabBag::ResetCollection()

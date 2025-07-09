@@ -13,6 +13,9 @@
 
 #include "PathGrabBag.h"
 
+#define INITIAL_WINDOW_WIDTH 800
+#define INITIAL_WINDOW_HEIGHT 600
+
 #define MAX_SETTINGS_WIDTH 200.0f
 #define MIN_SETTINGS_WIDTH 160.0f
 #define SETTINGS_HEIGHT 300.0f
@@ -21,11 +24,13 @@ struct AppState
 {
     SDL_Window* window = nullptr;
     SDL_Renderer* renderer = nullptr;
-
-    std::string current_folder = "";
+    float time_left_in_timer = 60.0;
     bool is_settings_opened = true;
     SDL_Texture* current_texture = nullptr;
     bool is_timer_running = false;
+    ImVec2 canvas_size = {INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT};
+    ImVec2 canvas_offset = {0.0f, 0.0f};
+    std::string current_folder = "";
 };
 
 PathGrabBag grab_bag{};
@@ -36,14 +41,12 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char** argv)
     AppState* new_app_state = new AppState;
 
     // Create Window
-    if (!SDL_CreateWindowAndRenderer("Figure Drawing Tool", 800, 600, 0, &new_app_state->window, &new_app_state->renderer))
+    if (!SDL_CreateWindowAndRenderer("Figure Drawing Tool", INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE, &new_app_state->window, &new_app_state->renderer))
     {
         SDL_Log("Coudn't Create Window or Renderer: %s", SDL_GetError());
         delete new_app_state;
         return SDL_APP_FAILURE;
     }
-
-    SDL_SetWindowResizable(new_app_state->window, true);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -99,20 +102,16 @@ void DrawCurrentTexture(AppState* state)
         float img_w, img_h;
         SDL_GetTextureSize(state->current_texture, &img_w, &img_h);
 
-        int window_w, window_h;
-
-        SDL_GetWindowSize(state->window, &window_w, &window_h);
-
-        float aspect_ratio = (float)window_h / img_h;
+        float aspect_ratio = state->canvas_size.y / img_h;
 
         SDL_FRect image_rect;
         image_rect.w = img_w * aspect_ratio;
         image_rect.h = img_h * aspect_ratio;
 
-        float available_side_space = ((float)window_w - image_rect.w) / 2;
+        float available_side_space = (state->canvas_size.x - image_rect.w) / 2;
         
-        image_rect.x = available_side_space;
-        image_rect.y = 0.0;
+        image_rect.x = available_side_space + state->canvas_offset.x;
+        image_rect.y = state->canvas_offset.y;
 
         SDL_RenderTexture(state->renderer, state->current_texture, NULL, &image_rect);
     }
@@ -123,7 +122,6 @@ bool DrawSettingsWindow(AppState* state)
     if (state->is_settings_opened)
     {
         ImGui::Begin("Settings", &(state->is_settings_opened), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
-        ImGui::SetWindowPos({0.0, 0.0});
         if (state->current_folder.empty())
         {
             ImGui::Text("No Folder Selected");
@@ -163,14 +161,32 @@ SDL_AppResult SDL_AppIterate(void* appstate)
 {
     AppState* state = static_cast<AppState*>(appstate);
 
+    int window_h, window_w;
+    SDL_GetWindowSize(state->window, &window_w, &window_h);
+
     SDL_SetRenderDrawColorFloat(state->renderer, 0.0f, 0.0f, 0.0f, SDL_ALPHA_OPAQUE_FLOAT);
     SDL_RenderClear(state->renderer);
 
-    DrawCurrentTexture(state);
+
 
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
+
+    ImGui::BeginMainMenuBar();
+    ImGui::EndMainMenuBar();
+
+    ImVec2 main_menu_bar_rect = ImGui::GetItemRectSize();
+    
+    state->canvas_size.x = window_w;
+    state->canvas_size.y = window_h - main_menu_bar_rect.y;
+
+    state->canvas_offset.y = main_menu_bar_rect.y;
+    
+    DrawCurrentTexture(state);
+    
+    
+    ImGui::SetNextWindowPos({0.0, main_menu_bar_rect.y});
 
     if (DrawSettingsWindow(state))
     {
