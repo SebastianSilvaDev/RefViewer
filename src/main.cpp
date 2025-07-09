@@ -13,13 +13,19 @@
 
 #include "PathGrabBag.h"
 
+#define MAX_SETTINGS_WIDTH 200.0f
+#define MIN_SETTINGS_WIDTH 160.0f
+#define SETTINGS_HEIGHT 300.0f
+
 struct AppState
 {
     SDL_Window* window = nullptr;
     SDL_Renderer* renderer = nullptr;
+
     std::string current_folder = "";
     bool is_settings_opened = true;
     SDL_Texture* current_texture = nullptr;
+    bool is_timer_running = false;
 };
 
 PathGrabBag grab_bag{};
@@ -86,18 +92,8 @@ void LoadNextImage(AppState* appstate)
     appstate->current_texture = new_texture;
 }
 
-void UpdateCurrentTexture(AppState* appstate)
+void DrawCurrentTexture(AppState* state)
 {
-
-}
-
-SDL_AppResult SDL_AppIterate(void* appstate)
-{
-    AppState* state = static_cast<AppState*>(appstate);
-
-    SDL_SetRenderDrawColorFloat(state->renderer, 0.0f, 0.0f, 0.0f, SDL_ALPHA_OPAQUE_FLOAT);
-    SDL_RenderClear(state->renderer);
-
     if (state->current_texture != nullptr)
     {
         float img_w, img_h;
@@ -120,15 +116,13 @@ SDL_AppResult SDL_AppIterate(void* appstate)
 
         SDL_RenderTexture(state->renderer, state->current_texture, NULL, &image_rect);
     }
+}
 
-    ImGui_ImplSDLRenderer3_NewFrame();
-    ImGui_ImplSDL3_NewFrame();
-    ImGui::NewFrame();
-
+bool DrawSettingsWindow(AppState* state)
+{
     if (state->is_settings_opened)
     {
         ImGui::Begin("Settings", &(state->is_settings_opened), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
-        ImGui::SetWindowSize({160.0, 300.0});
         ImGui::SetWindowPos({0.0, 0.0});
         if (state->current_folder.empty())
         {
@@ -138,10 +132,14 @@ SDL_AppResult SDL_AppIterate(void* appstate)
         {
             ImGui::Text(state->current_folder.c_str());
         }
+        ImVec2 text_rect_size = ImGui::GetItemRectSize();
+        float settings_window_width = std::clamp(text_rect_size.x, MIN_SETTINGS_WIDTH, MAX_SETTINGS_WIDTH);
+        ImGui::SetWindowSize({settings_window_width, SETTINGS_HEIGHT});
+        
         bool button_clicked = ImGui::Button("Select Folder", {100.0, 20.0});
         if (button_clicked)
         {
-            SDL_ShowOpenFolderDialog(DialogCallback, appstate, state->window, NULL, false);
+            SDL_ShowOpenFolderDialog(DialogCallback, state, state->window, NULL, false);
         }
         if (grab_bag.IsGrabBagReady())
         {
@@ -155,22 +153,41 @@ SDL_AppResult SDL_AppIterate(void* appstate)
             ImGui::SameLine();
             ImGui::Button("Stop", {40.0, 20.0});
         }
+        ImGui::End();
+        return true;
+    }
+    return false;
+}
+
+SDL_AppResult SDL_AppIterate(void* appstate)
+{
+    AppState* state = static_cast<AppState*>(appstate);
+
+    SDL_SetRenderDrawColorFloat(state->renderer, 0.0f, 0.0f, 0.0f, SDL_ALPHA_OPAQUE_FLOAT);
+    SDL_RenderClear(state->renderer);
+
+    DrawCurrentTexture(state);
+
+    ImGui_ImplSDLRenderer3_NewFrame();
+    ImGui_ImplSDL3_NewFrame();
+    ImGui::NewFrame();
+
+    if (DrawSettingsWindow(state))
+    {
         auto Window1Size = ImGui::GetWindowSize();
         ImGui::SetNextWindowPos({0.0, Window1Size.y + 16.0f});
-        ImGui::End();
     }
     else
     {
         ImGui::SetNextWindowPos({0.0, 0.0});
     }
 
-    // ImGui::Begin("Second UI", NULL, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
-    // ImGui::Text("Hello From Another thingy");
-    // ImGui::End();
+    ImGui::Begin("Timer", NULL, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+    ImGui::Text("Hello From Another thingy");
+    ImGui::GetItemRectSize();
+    ImGui::End();
     
     ImGui::Render();
-    
-    
 
     ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), state->renderer);
 
