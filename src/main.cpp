@@ -37,6 +37,8 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char** argv)
         return SDL_APP_FAILURE;
     }
 
+    SDL_SetWindowResizable(new_app_state->window, true);
+
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
@@ -108,10 +110,13 @@ SDL_AppResult SDL_AppIterate(void* appstate)
         float aspect_ratio = (float)window_h / img_h;
 
         SDL_FRect image_rect;
-        image_rect.x = 0.0;
+        image_rect.w = img_w * aspect_ratio;
+        image_rect.h = img_h * aspect_ratio;
+
+        float available_side_space = ((float)window_w - image_rect.w) / 2;
+        
+        image_rect.x = available_side_space;
         image_rect.y = 0.0;
-        image_rect.w = (float)window_w / aspect_ratio;
-        image_rect.h = (float)window_h / aspect_ratio;
 
         SDL_RenderTexture(state->renderer, state->current_texture, NULL, &image_rect);
     }
