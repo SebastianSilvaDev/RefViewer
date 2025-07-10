@@ -62,6 +62,11 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char** argv)
 
 void DialogCallback (void *userdata, const char * const *filelist, int filter)
 {
+    if (!filelist)
+    {
+        SDL_Log("Error Ocurred: %s", SDL_GetError());
+        return;
+    }
     if (!*filelist)
     {
         SDL_Log("Failed To Get a Path");
@@ -78,7 +83,12 @@ void DialogCallback (void *userdata, const char * const *filelist, int filter)
     grab_bag.ResetCollection();
     for (auto& entry : std::filesystem::recursive_directory_iterator(path))
     {
-        SDL_Log("File Found: %s", entry.path().string().c_str());
+        if (entry.is_directory())
+        {
+            continue;
+        }
+        std::filesystem::path extension = entry.path().extension();
+        if (extension != ".jpg" and extension != ".JPG") continue; // Lets support just JPG for now
         grab_bag.AddPathToGrabBag(entry.path());
     }
     grab_bag.InitializeBag();
