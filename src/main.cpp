@@ -18,7 +18,7 @@
 
 #define MAX_SETTINGS_WIDTH 200.0f
 #define MIN_SETTINGS_WIDTH 160.0f
-#define SETTINGS_HEIGHT 300.0f
+#define SETTINGS_HEIGHT 200.0f
 
 struct AppState
 {
@@ -88,6 +88,7 @@ void DialogCallback (void *userdata, const char * const *filelist, int filter)
             continue;
         }
         std::filesystem::path extension = entry.path().extension();
+        
         if (extension != ".jpg" and extension != ".JPG") continue; // Lets support just JPG for now
         grab_bag.AddPathToGrabBag(entry.path());
     }
@@ -127,7 +128,7 @@ void DrawCurrentTexture(AppState* state)
     }
 }
 
-bool DrawSettingsWindow(AppState* state)
+void DrawSettingsWindow(AppState* state)
 {
     if (state->is_settings_opened)
     {
@@ -142,6 +143,7 @@ bool DrawSettingsWindow(AppState* state)
         }
         ImVec2 text_rect_size = ImGui::GetItemRectSize();
         float settings_window_width = std::clamp(text_rect_size.x, MIN_SETTINGS_WIDTH, MAX_SETTINGS_WIDTH);
+        
         ImGui::SetWindowSize({settings_window_width, SETTINGS_HEIGHT});
         
         bool button_clicked = ImGui::Button("Select Folder", {100.0, 20.0});
@@ -162,9 +164,11 @@ bool DrawSettingsWindow(AppState* state)
             ImGui::Button("Stop", {40.0, 20.0});
         }
         ImGui::End();
-        return true;
+        ImGui::SetNextWindowPos({state->canvas_offset.x, SETTINGS_HEIGHT + state->canvas_offset.y});
+        return;
     }
-    return false;
+    ImGui::SetNextWindowPos({state->canvas_offset.x, state->canvas_offset.y});
+    return;
 }
 
 SDL_AppResult SDL_AppIterate(void* appstate)
@@ -198,15 +202,7 @@ SDL_AppResult SDL_AppIterate(void* appstate)
     
     ImGui::SetNextWindowPos({0.0, main_menu_bar_rect.y});
 
-    if (DrawSettingsWindow(state))
-    {
-        auto Window1Size = ImGui::GetWindowSize();
-        ImGui::SetNextWindowPos({0.0, Window1Size.y + 16.0f});
-    }
-    else
-    {
-        ImGui::SetNextWindowPos({0.0, 0.0});
-    }
+    DrawSettingsWindow(state);
 
     ImGui::Begin("Timer", NULL, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
     ImGui::Text("Hello From Another thingy");
